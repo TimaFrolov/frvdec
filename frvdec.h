@@ -5,6 +5,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum {
   FRV_UNDEF = -1,
   FRV_PARTIAL = -2,
@@ -57,9 +61,13 @@ struct FrvInst {
   int32_t imm;
 };
 
-int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvInst* restrict frv_inst);
+int frv_decode(size_t bufsz, const uint8_t* buf, FrvInst* frv_inst);
 
 // Note: actual format is unstable.
-void frv_format(const FrvInst* inst, size_t len, char buf[len]);
+void frv_format(const FrvInst* inst, size_t len, char* buf);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
