@@ -10,43 +10,33 @@
 #define UBFX(val, start, end) (((val) >> start) & ((1 << (end - start + 1)) - 1))
 #define UNLIKELY(x) __builtin_expect((x), 0)
 
-enum {
-  ENC_F_RD  = 1 << 0,
-  ENC_F_RS1 = 1 << 1,
-  ENC_F_RS2 = 1 << 2,
-  ENC_F_RS3 = 1 << 3,
-  ENC_F_IMM_MASK = 7 << 4, // 3 bits
-  ENC_F_IMM_U = 1 << 4,
-  ENC_F_IMM_I = 2 << 4,
-  ENC_F_IMM_S = 3 << 4,
-  ENC_F_IMM_J = 4 << 4,
-  ENC_F_IMM_B = 5 << 4,
-  ENC_F_IMM_SHAMT = 6 << 4,
-  ENC_F_IMM_AMO = 7 << 4,
-  ENC_F_RM  = 1 << 7, // rounding mode
+static int frv_decode4(uint32_t inst, FrvInst* restrict frv_inst) {
+  enum {
+    ENC_F_RD  = 1 << 0,
+    ENC_F_RS1 = 1 << 1,
+    ENC_F_RS2 = 1 << 2,
+    ENC_F_RS3 = 1 << 3,
+    ENC_F_IMM_MASK = 7 << 4, // 3 bits
+    ENC_F_IMM_U = 1 << 4,
+    ENC_F_IMM_I = 2 << 4,
+    ENC_F_IMM_S = 3 << 4,
+    ENC_F_IMM_J = 4 << 4,
+    ENC_F_IMM_B = 5 << 4,
+    ENC_F_IMM_SHAMT = 6 << 4,
+    ENC_F_IMM_AMO = 7 << 4,
+    ENC_F_RM  = 1 << 7, // rounding mode
 
-  ENC_R = ENC_F_RD | ENC_F_RS1 | ENC_F_RS2,
-  ENC_R2 = ENC_F_RD | ENC_F_RS1,
-  ENC_R4 = ENC_F_RD | ENC_F_RS1 | ENC_F_RS2 | ENC_F_RS3,
-  ENC_I = ENC_F_RD | ENC_F_RS1 | ENC_F_IMM_I,
-  ENC_I_SHAMT = ENC_F_RD | ENC_F_RS1 | ENC_F_IMM_SHAMT,
-  ENC_S = ENC_F_RS1 | ENC_F_RS2 | ENC_F_IMM_S,
-  ENC_B = ENC_F_RS1 | ENC_F_RS2 | ENC_F_IMM_B,
-  ENC_U = ENC_F_RD | ENC_F_IMM_U,
-  ENC_J = ENC_F_RD | ENC_F_IMM_J,
-};
+    ENC_R = ENC_F_RD | ENC_F_RS1 | ENC_F_RS2,
+    ENC_R2 = ENC_F_RD | ENC_F_RS1,
+    ENC_R4 = ENC_F_RD | ENC_F_RS1 | ENC_F_RS2 | ENC_F_RS3,
+    ENC_I = ENC_F_RD | ENC_F_RS1 | ENC_F_IMM_I,
+    ENC_I_SHAMT = ENC_F_RD | ENC_F_RS1 | ENC_F_IMM_SHAMT,
+    ENC_S = ENC_F_RS1 | ENC_F_RS2 | ENC_F_IMM_S,
+    ENC_B = ENC_F_RS1 | ENC_F_RS2 | ENC_F_IMM_B,
+    ENC_U = ENC_F_RD | ENC_F_IMM_U,
+    ENC_J = ENC_F_RD | ENC_F_IMM_J,
+  };
 
-int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvInst* restrict frv_inst) {
-  if (UNLIKELY(bufsz < 2))
-    return FRV_PARTIAL;
-  if ((buf[0] & 0x03) != 0x03)
-    return FRV_UNDEF; // 16-bit compressed instructions
-  if ((buf[0] & 0x1c) == 0x1c)
-    return FRV_UNDEF; // instruction length > 32 bit
-  if (UNLIKELY(bufsz < 4))
-    return FRV_PARTIAL;
-
-  uint32_t inst = LOAD_LE_4(buf);
   unsigned opcode = UBFX(inst, 2, 6);
   unsigned funct3 = UBFX(inst, 12, 14);
   unsigned funct7 = UBFX(inst, 25, 31);
@@ -195,6 +185,19 @@ int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvInst* restrict frv_ins
   }
 
   return 4;
+}
+
+int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvInst* restrict frv_inst) {
+  if (UNLIKELY(bufsz < 2))
+    return FRV_PARTIAL;
+  if ((buf[0] & 0x03) != 0x03)
+    return FRV_UNDEF; // 16-bit compressed instructions
+  if ((buf[0] & 0x1c) != 0x1c) {
+    if (UNLIKELY(bufsz < 4))
+      return FRV_PARTIAL;
+    return frv_decode4(LOAD_LE_4(buf), frv_inst);
+  }
+  return FRV_UNDEF; // instruction length > 32 bit
 }
 
 static void strlcat(char* restrict dst, const char* src, size_t size) {
