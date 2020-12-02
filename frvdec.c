@@ -23,8 +23,11 @@ enum {
   ENC_F_IMM_B = 5 << 4,
   ENC_F_IMM_SHAMT = 6 << 4,
   ENC_F_IMM_AMO = 7 << 4,
+  ENC_F_RM  = 1 << 7, // rounding mode
 
   ENC_R = ENC_F_RD | ENC_F_RS1 | ENC_F_RS2,
+  ENC_R2 = ENC_F_RD | ENC_F_RS1,
+  ENC_R4 = ENC_F_RD | ENC_F_RS1 | ENC_F_RS2 | ENC_F_RS3,
   ENC_I = ENC_F_RD | ENC_F_RS1 | ENC_F_IMM_I,
   ENC_I_SHAMT = ENC_F_RD | ENC_F_RS1 | ENC_F_IMM_SHAMT,
   ENC_S = ENC_F_RS1 | ENC_F_RS2 | ENC_F_IMM_S,
@@ -52,6 +55,9 @@ int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvInst* restrict frv_ins
   case 0x00: encoding = ENC_I;
     mnem = (const uint16_t[]) {FRV_LB, FRV_LH, FRV_LW, FRV_LD, FRV_LBU, FRV_LHU, FRV_LWU, 0}[funct3];
     break;
+  case 0x01: encoding = ENC_I;
+    mnem = (const uint16_t[]) {0, 0, FRV_FLW, FRV_FLD, 0, 0, 0, 0}[funct3];
+    break;
   case 0x03: encoding = ENC_I;
     mnem = (const uint16_t[]) {FRV_FENCE, FRV_FENCEI, 0, 0, 0, 0, 0, 0}[funct3];
     break;
@@ -78,6 +84,9 @@ int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvInst* restrict frv_ins
     break;
   case 0x08: encoding = ENC_S;
     mnem = (const uint16_t[]) {FRV_SB, FRV_SH, FRV_SW, FRV_SD, 0, 0, 0, 0}[funct3];
+    break;
+  case 0x09: encoding = ENC_S;
+    mnem = (const uint16_t[]) {0, 0, FRV_FSW, FRV_FSD, 0, 0, 0, 0}[funct3];
     break;
   case 0x0b: encoding = ENC_R | ENC_F_IMM_AMO;
     switch (funct7 >> 2) {
@@ -112,6 +121,41 @@ int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvInst* restrict frv_ins
     default: return FRV_UNDEF;
     }
     break;
+  case 0x10: encoding = ENC_R4 | ENC_F_RM; mnem = (const uint16_t[4]) {FRV_FMADDS, FRV_FMADDD}[UBFX(inst, 25, 26)]; break;
+  case 0x11: encoding = ENC_R4 | ENC_F_RM; mnem = (const uint16_t[4]) {FRV_FMSUBS, FRV_FMSUBD}[UBFX(inst, 25, 26)]; break;
+  case 0x12: encoding = ENC_R4 | ENC_F_RM; mnem = (const uint16_t[4]) {FRV_FNMSUBS, FRV_FNMSUBD}[UBFX(inst, 25, 26)]; break;
+  case 0x13: encoding = ENC_R4 | ENC_F_RM; mnem = (const uint16_t[4]) {FRV_FNMADDS, FRV_FNMADDD}[UBFX(inst, 25, 26)]; break;
+  case 0x14:
+    switch (funct7) {
+    case 0x00: encoding = ENC_R | ENC_F_RM; mnem = FRV_FADDS; break;
+    case 0x01: encoding = ENC_R | ENC_F_RM; mnem = FRV_FADDD; break;
+    case 0x04: encoding = ENC_R | ENC_F_RM; mnem = FRV_FSUBS; break;
+    case 0x05: encoding = ENC_R | ENC_F_RM; mnem = FRV_FSUBD; break;
+    case 0x08: encoding = ENC_R | ENC_F_RM; mnem = FRV_FMULS; break;
+    case 0x09: encoding = ENC_R | ENC_F_RM; mnem = FRV_FMULD; break;
+    case 0x0c: encoding = ENC_R | ENC_F_RM; mnem = FRV_FDIVS; break;
+    case 0x0d: encoding = ENC_R | ENC_F_RM; mnem = FRV_FDIVD; break;
+    case 0x2c: encoding = ENC_R2 | ENC_F_RM; mnem = FRV_FSQRTS; break; // TODO: check rs2
+    case 0x2d: encoding = ENC_R2 | ENC_F_RM; mnem = FRV_FSQRTD; break; // TODO: check rs2
+    case 0x10: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FSGNJS, FRV_FSGNJNS, FRV_FSGNJXS, 0, 0, 0, 0, 0}[funct3]; break;
+    case 0x11: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FSGNJD, FRV_FSGNJND, FRV_FSGNJXD, 0, 0, 0, 0, 0}[funct3]; break;
+    case 0x14: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FMINS, FRV_FMAXS, 0, 0, 0, 0, 0, 0}[funct3]; break;
+    case 0x15: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FMIND, FRV_FMAXD, 0, 0, 0, 0, 0, 0}[funct3]; break;
+    case 0x40: encoding = ENC_R2 | ENC_F_RM; mnem = (const uint16_t[32]) {0, FRV_FCVTSD}[UBFX(inst, 20, 24)]; break;
+    case 0x41: encoding = ENC_R2 | ENC_F_RM; mnem = (const uint16_t[32]) {FRV_FCVTDS}[UBFX(inst, 20, 24)]; break;
+    case 0x50: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FLES, FRV_FLTS, FRV_FEQS, 0, 0, 0, 0, 0}[funct3]; break;
+    case 0x51: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FLED, FRV_FLTD, FRV_FEQD, 0, 0, 0, 0, 0}[funct3]; break;
+    case 0x60: encoding = ENC_R2 | ENC_F_RM; mnem = (const uint16_t[32]) {FRV_FCVTWS, FRV_FCVTWUS, FRV_FCVTLS, FRV_FCVTLUS}[UBFX(inst, 20, 24)]; break;
+    case 0x61: encoding = ENC_R2 | ENC_F_RM; mnem = (const uint16_t[32]) {FRV_FCVTWD, FRV_FCVTWUD, FRV_FCVTLD, FRV_FCVTLUD}[UBFX(inst, 20, 24)]; break;
+    case 0x68: encoding = ENC_R2 | ENC_F_RM; mnem = (const uint16_t[32]) {FRV_FCVTSW, FRV_FCVTSWU, FRV_FCVTSL, FRV_FCVTSLU}[UBFX(inst, 20, 24)]; break;
+    case 0x69: encoding = ENC_R2 | ENC_F_RM; mnem = (const uint16_t[32]) {FRV_FCVTDW, FRV_FCVTDWU, FRV_FCVTDL, FRV_FCVTDLU}[UBFX(inst, 20, 24)]; break;
+    case 0x70: encoding = ENC_R2; mnem = (const uint16_t[]) {FRV_FMVXW, FRV_FCLASSS, 0, 0, 0, 0, 0, 0}[funct3]; break; // TODO: check rs2
+    case 0x71: encoding = ENC_R2; mnem = (const uint16_t[]) {FRV_FMVXD, FRV_FCLASSD, 0, 0, 0, 0, 0, 0}[funct3]; break; // TODO: check rs2
+    case 0x78: encoding = ENC_R2; mnem = (const uint16_t[]) {FRV_FMVWX, 0, 0, 0, 0, 0, 0, 0}[funct3]; break; // TODO: check rs2
+    case 0x79: encoding = ENC_R2; mnem = (const uint16_t[]) {FRV_FMVDX, 0, 0, 0, 0, 0, 0, 0}[funct3]; break; // TODO: check rs2
+    default: return FRV_UNDEF;
+    }
+    break;
   case 0x18: encoding = ENC_B;
     mnem = (const uint16_t[]) {FRV_BEQ, FRV_BNE, 0, 0, FRV_BLT, FRV_BGE, FRV_BLTU, FRV_BGEU}[funct3];
     break;
@@ -129,6 +173,8 @@ int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvInst* restrict frv_ins
   frv_inst->rs1 = (encoding & ENC_F_RS1) ? UBFX(inst, 15, 19) : FRV_REG_INV;
   frv_inst->rs2 = (encoding & ENC_F_RS2) ? UBFX(inst, 20, 24) : FRV_REG_INV;
   frv_inst->rs3 = (encoding & ENC_F_RS3) ? UBFX(inst, 27, 31) : FRV_REG_INV;
+  if (encoding & ENC_F_RM)
+    frv_inst->misc = funct3;
   switch (encoding & ENC_F_IMM_MASK) {
   default: frv_inst->imm = 0; break;
   case ENC_F_IMM_U: frv_inst->imm = UBFX(inst, 12, 31) << 12; break;
@@ -222,6 +268,35 @@ void frv_format(const FrvInst* inst, size_t len, char buf[len]) {
     [FRV_CSRRW] = "csrrw", [FRV_CSRRWI] = "csrrwi",
     [FRV_CSRRS] = "csrrs", [FRV_CSRRSI] = "csrrsi",
     [FRV_CSRRC] = "csrrc", [FRV_CSRRCI] = "csrrci",
+
+    [FRV_FLW] = "flw", [FRV_FSW] = "fsw",
+    [FRV_FMVXW] = "fmv.x.w", [FRV_FMVWX] = "fmv.w.x", [FRV_FCLASSS] = "fclass.s",
+    [FRV_FMADDS] = "fmadd.s", [FRV_FMSUBS] = "fmsub.s",
+    [FRV_FNMSUBS] = "fnmsub.s", [FRV_FNMADDS] = "fnmadd.s",
+    [FRV_FADDS] = "fadd.s", [FRV_FSUBS] = "fsub.s",
+    [FRV_FMULS] = "fmul.s", [FRV_FDIVS] = "fdiv.s", [FRV_FSQRTS] = "fsqrt.s",
+    [FRV_FSGNJS] = "fsgnj.s", [FRV_FSGNJNS] = "fsgnjn.s",
+    [FRV_FSGNJXS] = "fsgnjx.s", [FRV_FMINS] = "fmin.s", [FRV_FMAXS] = "fmax.s",
+    [FRV_FLES] = "fle.s", [FRV_FLTS] = "flt.s", [FRV_FEQS] = "feq.s",
+    [FRV_FCVTWS] = "fcvt.w.s", [FRV_FCVTWUS] = "fcvt.wu.s",
+    [FRV_FCVTLS] = "fcvt.l.s", [FRV_FCVTLUS] = "fcvt.lu.s",
+    [FRV_FCVTSW] = "fcvt.s.w", [FRV_FCVTSWU] = "fcvt.s.wu",
+    [FRV_FCVTSL] = "fcvt.s.l", [FRV_FCVTSLU] = "fcvt.s.lu",
+    // RV32D/RV64D
+    [FRV_FLD] = "fld", [FRV_FSD] = "fsd",
+    [FRV_FMVXD] = "fmv.x.d", [FRV_FMVDX] = "fmv.d.x", [FRV_FCLASSD] = "fclass.d",
+    [FRV_FMADDD] = "fmadd.d", [FRV_FMSUBD] = "fmsub.d",
+    [FRV_FNMSUBD] = "fnmsub.d", [FRV_FNMADDD] = "fnmadd.d",
+    [FRV_FADDD] = "fadd.d", [FRV_FSUBD] = "fsub.d",
+    [FRV_FMULD] = "fmul.d", [FRV_FDIVD] = "fdiv.d", [FRV_FSQRTD] = "fsqrt.d",
+    [FRV_FSGNJD] = "fsgnj.d", [FRV_FSGNJND] = "fsgnjn.d",
+    [FRV_FSGNJXD] = "fsgnjx.d", [FRV_FMIND] = "fmin.d", [FRV_FMAXD] = "fmax.d",
+    [FRV_FLED] = "fle.d", [FRV_FLTD] = "flt.d", [FRV_FEQD] = "feq.d",
+    [FRV_FCVTSD] = "fcvt.s.d", [FRV_FCVTDS] = "fcvt.d.s",
+    [FRV_FCVTWD] = "fcvt.w.d", [FRV_FCVTWUD] = "fcvt.wu.d",
+    [FRV_FCVTLD] = "fcvt.l.d", [FRV_FCVTLUD] = "fcvt.lu.d",
+    [FRV_FCVTDW] = "fcvt.d.w", [FRV_FCVTDWU] = "fcvt.d.wu",
+    [FRV_FCVTDL] = "fcvt.d.l", [FRV_FCVTDLU] = "fcvt.d.lu",
   };
   if (inst->mnem >= sizeof mnem_str / sizeof mnem_str[0] || !mnem_str[inst->mnem]) {
     strlcat(buf, "<invalid>", len);

@@ -38,6 +38,10 @@ int main(void) {
   failed |= test(0x0007879b, "addiw r15 r15");
   failed |= test(0x00008067, "jalr r0 r1");
   failed |= test(0x0700006f, "jal r0 112");
+  failed |= test(0x20a93c27, "fsd r18 r10 536");
+  failed |= test(0xe20505d3, "fmv.x.d r11 r10");
+  failed |= test(0xd2287553, "fcvt.d.l r10 r16");
+  failed |= test(0x02957553, "fadd.d r10 r10 r9");
 
   puts(failed ? "Some tests FAILED" : "All tests PASSED");
   return failed ? EXIT_FAILURE : EXIT_SUCCESS;
