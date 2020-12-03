@@ -8,6 +8,7 @@
 #define LOAD_LE_2(buf) (LOAD_LE_1(buf) | LOAD_LE_1((uint8_t*) (buf) + 1)<<8)
 #define LOAD_LE_4(buf) (LOAD_LE_2(buf) | LOAD_LE_2((uint8_t*) (buf) + 2)<<16)
 #define UBFX(val, start, end) (((val) >> start) & ((1 << (end - start + 1)) - 1))
+#define SBFX(val, start, end) ((struct { long v: end-start+1; }) {UBFX(val, start, end)}.v)
 #define UNLIKELY(x) __builtin_expect((x), 0)
 
 static int frv_decode4(uint32_t inst, FrvInst* restrict frv_inst) {
@@ -187,13 +188,219 @@ static int frv_decode4(uint32_t inst, FrvInst* restrict frv_inst) {
   return 4;
 }
 
+static int frv_decode2(uint16_t inst, FrvOptions opt,
+                       FrvInst* restrict frv_inst) {
+  enum {
+    ENC_I_NONE = 0,
+    ENC_NZU_54_96_2_3,
+    ENC_U_53_76,
+    ENC_U_53_26,
+    ENC_U_5_42_76,
+    ENC_U_5_43_86,
+    ENC_U_52_76,
+    ENC_U_53_86,
+    ENC_I_5_40,
+    ENC_NZI_5_40,
+    ENC_NZU_5_40,
+    ENC_I_11_4_98_10_6_7_31_5,
+    ENC_NZI_9_4_6_87_5,
+    ENC_I_8_43_76_21_5,
+    ENC_NZI_17_1612,
+    ENC_I_EBREAK,
+  } imm_enc = ENC_I_NONE;
+  unsigned rs2f = UBFX(inst, 2, 6);
+  unsigned rs2c = UBFX(inst, 2, 4) + 8;
+  unsigned rs1f = UBFX(inst, 7, 11);
+  unsigned rs1c = UBFX(inst, 7, 9) + 8;
+  unsigned mnem = 0, rd = FRV_REG_INV, rs1 = FRV_REG_INV, rs2 = FRV_REG_INV;
+  switch (inst & 0xe003) {
+  case 0x0000:
+    mnem = FRV_ADDI, rd = rs2c, rs1 = 2, imm_enc = ENC_NZU_54_96_2_3;
+    break;
+  case 0x2000:
+    if ((opt & FRV_RVMSK) == FRV_RV128)
+      return FRV_UNDEF; // TODO
+    mnem = FRV_FLD, rd = rs2c, rs1 = rs1c, imm_enc = ENC_U_53_76;
+    break;
+  case 0x4000:
+    mnem = FRV_LW, rd = rs2c, rs1 = rs1c, imm_enc = ENC_U_53_26;
+    break;
+  case 0x6000:
+    if ((opt & FRV_RVMSK) == FRV_RV32)
+      mnem = FRV_FLW, rd = rs2c, rs1 = rs1c, imm_enc = ENC_U_53_26;
+    else
+      mnem = FRV_LD, rd = rs2c, rs1 = rs1c, imm_enc = ENC_U_53_76;
+    break;
+  case 0xa000:
+    if ((opt & FRV_RVMSK) != FRV_RV128)
+      mnem = FRV_FSD, rs1 = rs1c, rs2 = rs2c, imm_enc = ENC_U_53_76;
+    // TODO: RV128 C.SQ
+    break;
+  case 0xc000:
+    mnem = FRV_SW, rs1 = rs1c, rs2 = rs2c, imm_enc = ENC_U_53_26;
+    break;
+  case 0xe000:
+    if ((opt & FRV_RVMSK) == FRV_RV32)
+      mnem = FRV_FSW, rs1 = rs1c, rs2 = rs2c, imm_enc = ENC_U_53_26;
+    else
+      mnem = FRV_SD, rs1 = rs1c, rs2 = rs2c, imm_enc = ENC_U_53_76;
+    break;
+
+  case 0x0001:
+    mnem = FRV_ADDI, rd = rs1f, rs1 = rs1f, imm_enc = ENC_NZI_5_40;
+    break;
+  case 0x2001:
+    if ((opt & FRV_RVMSK) == FRV_RV32) {
+      mnem = FRV_JAL, rd = 1, imm_enc = ENC_I_11_4_98_10_6_7_31_5;
+    } else {
+      if (rs1f == 0)
+        return FRV_UNDEF;
+      mnem = FRV_ADDIW, rd = rs1f, rs1 = rs1f, imm_enc = ENC_I_5_40;
+    }
+    break;
+  case 0x4001:
+    if (rs1f == 0)
+      return FRV_UNDEF;
+    mnem = FRV_ADDI, rd = rs1f, rs1 = 0, imm_enc = ENC_I_5_40;
+    break;
+  case 0x6001:
+    if (rs1f == 0)
+      return FRV_UNDEF;
+    if (rs1f == 2)
+      mnem = FRV_ADDI, rd = rs1f, rs1 = rs1f, imm_enc = ENC_NZI_9_4_6_87_5;
+    else
+      mnem = FRV_LUI, rd = rs1f, imm_enc = ENC_NZI_17_1612;
+    break;
+  case 0x8001:
+    switch (UBFX(inst, 10, 11)) {
+    case 0: mnem = FRV_SRLI, rd = rs1c, rs1 = rs1c, imm_enc = ENC_NZU_5_40; break;
+    case 1: mnem = FRV_SRAI, rd = rs1c, rs1 = rs1c, imm_enc = ENC_NZU_5_40; break;
+    case 2: mnem = FRV_ANDI, rd = rs1c, rs1 = rs1c, imm_enc = ENC_I_5_40; break;
+    case 3:
+      rd = rs1c, rs1 = rs1c, rs2 = rs2c, mnem = UBFX(inst, 5, 6) | (UBFX(inst, 12, 12) << 2);
+      mnem = (const uint16_t[8]) {FRV_SUB, FRV_XOR, FRV_OR, FRV_AND, FRV_SUBW, FRV_ADDW}[mnem];
+      break;
+    }
+    break;
+  case 0xa001:
+    mnem = FRV_JAL, rd = 0, imm_enc = ENC_I_11_4_98_10_6_7_31_5;
+    break;
+  case 0xc001:
+    mnem = FRV_BEQ, rs1 = rs1c, rs2 = 0, imm_enc = ENC_I_8_43_76_21_5;
+    break;
+  case 0xe001:
+    mnem = FRV_BNE, rs1 = rs1c, rs2 = 0, imm_enc = ENC_I_8_43_76_21_5;
+    break;
+
+  case 0x0002:
+    mnem = FRV_SLLI, rd = rs1f, rs1 = rs1f, imm_enc = ENC_NZU_5_40;
+    break;
+  case 0x2002:
+    if ((opt & FRV_RVMSK) != FRV_RV128)
+      mnem = FRV_FLD, rd = rs1f, rs1 = 2, imm_enc = ENC_U_5_43_86;
+    // TODO: RV128 C.LQSP
+    break;
+  case 0x4002:
+    mnem = FRV_LW, rd = rs1f, rs1 = 2, imm_enc = ENC_U_5_42_76;
+    break;
+  case 0x6002:
+    if ((opt & FRV_RVMSK) == FRV_RV32)
+      mnem = FRV_FLW, rd = rs1f, rs1 = 2, imm_enc = ENC_U_5_42_76;
+    else
+      mnem = FRV_LD, rd = rs1f, rs1 = 2, imm_enc = ENC_U_5_43_86;
+    break;
+  case 0x8002:
+    if (!(inst & 0x1000)) {
+      if (rs1f == 0)
+        return FRV_UNDEF;
+      if (rs2f == 0)
+        mnem = FRV_JALR, rd = 0, rs1 = rs1f;
+      else
+        mnem = FRV_ADD, rd = rs1f, rs1 = 0, rs2 = rs2f;
+    } else {
+      if (rs1f == 0)
+        mnem = FRV_ECALL, imm_enc = ENC_I_EBREAK;
+      else if (rs2f == 0)
+        mnem = FRV_JALR, rd = 1, rs1 = rs1f;
+      else
+        mnem = FRV_ADD, rd = rs1f, rs1 = rs1f, rs2 = rs2f;
+    }
+    break;
+  case 0xa002:
+    if ((opt & FRV_RVMSK) != FRV_RV128)
+      mnem = FRV_FSD, rs1 = 2, rs2 = rs2f, imm_enc = ENC_U_53_86;
+    // TODO: RV128 C.LQSP
+    break;
+  case 0xc002:
+    mnem = FRV_SW, rs1 = 2, rs2 = rs2f, imm_enc = ENC_U_52_76;
+    break;
+  case 0xe002:
+    if ((opt & FRV_RVMSK) == FRV_RV32)
+      mnem = FRV_FSW, rs1 = 2, rs2 = rs2f, imm_enc = ENC_U_52_76;
+    else
+      mnem = FRV_SD, rs1 = 2, rs2 = rs2f, imm_enc = ENC_U_53_86;
+    break;
+  }
+
+  if (!mnem)
+    return FRV_UNDEF;
+  frv_inst->mnem = mnem;
+  frv_inst->rd = rd;
+  frv_inst->rs1 = rs1;
+  frv_inst->rs2 = rs2;
+  frv_inst->rs3 = FRV_REG_INV;
+  switch (imm_enc) {
+  case ENC_I_NONE: frv_inst->imm = 0; break;
+  case ENC_I_EBREAK: frv_inst->imm = 1; break;
+  case ENC_I_5_40: frv_inst->imm = SBFX(inst, 12, 12) << 5 | UBFX(inst, 2, 6); break;
+  case ENC_NZI_9_4_6_87_5:
+    frv_inst->imm = SBFX(inst, 12, 12) << 9 | UBFX(inst, 3, 4) << 7 |
+                    UBFX(inst, 5, 5) << 6 | UBFX(inst, 2, 2) << 5 |
+                    UBFX(inst, 6, 6) << 4; break;
+  case ENC_NZU_54_96_2_3:
+    frv_inst->imm = UBFX(inst, 7, 10) << 6 | UBFX(inst, 11, 12) << 4 |
+                    UBFX(inst, 5, 5) << 3 | UBFX(inst, 6, 6) << 2; break;
+  case ENC_U_53_76:
+    frv_inst->imm = UBFX(inst, 5, 6) << 6 | UBFX(inst, 10, 12) << 3; break;
+  case ENC_U_53_26:
+    frv_inst->imm = UBFX(inst, 5, 5) << 6 | UBFX(inst, 10, 12) << 3 |
+                    UBFX(inst, 6, 6) << 2; break;
+  case ENC_U_5_43_86:
+    frv_inst->imm = UBFX(inst, 2, 4) << 6 | UBFX(inst, 12, 12) << 5 |
+                    UBFX(inst, 5, 6) << 3; break;
+  case ENC_U_5_42_76:
+    frv_inst->imm = UBFX(inst, 2, 3) << 6 | UBFX(inst, 12, 12) << 5 |
+                    UBFX(inst, 4, 6) << 2; break;
+  case ENC_U_52_76:
+    frv_inst->imm = UBFX(inst, 7, 8) << 6 | UBFX(inst, 9, 12) << 2; break;
+  case ENC_U_53_86:
+    frv_inst->imm = UBFX(inst, 7, 9) << 6 | UBFX(inst, 10, 12) << 3; break;
+  case ENC_NZU_5_40:
+    frv_inst->imm = UBFX(inst, 12, 12) << 5 | UBFX(inst, 2, 6); break;
+  case ENC_NZI_5_40:
+    frv_inst->imm = SBFX(inst, 12, 12) << 5 | UBFX(inst, 2, 6); break;
+  case ENC_I_8_43_76_21_5:
+    frv_inst->imm = SBFX(inst, 12, 12) << 8 | UBFX(inst, 5, 6) << 6 |
+                    UBFX(inst, 2, 2) << 5 | UBFX(inst, 10, 11) << 3 |
+                    UBFX(inst, 3, 4) << 1; break;
+  case ENC_I_11_4_98_10_6_7_31_5:
+    frv_inst->imm = SBFX(inst, 12, 12) << 11 | UBFX(inst, 8, 8) << 10 |
+                    UBFX(inst, 9, 10) << 8 | UBFX(inst, 6, 6) << 7 |
+                    UBFX(inst, 7, 7) << 6 | UBFX(inst, 2, 2) << 5 |
+                    UBFX(inst, 11, 11) << 4 | UBFX(inst, 3, 5) << 1; break;
+  case ENC_NZI_17_1612:
+    frv_inst->imm = SBFX(inst, 12, 12) << 17 | UBFX(inst, 2, 6) << 12; break;
+  default: return FRV_UNDEF;
+  }
+  return 2;
+}
+
 int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvOptions opt,
                FrvInst* restrict frv_inst) {
-  (void) opt;
   if (UNLIKELY(bufsz < 2))
     return FRV_PARTIAL;
   if ((buf[0] & 0x03) != 0x03)
-    return FRV_UNDEF; // 16-bit compressed instructions
+    return frv_decode2(LOAD_LE_2(buf), opt, frv_inst);
   if ((buf[0] & 0x1c) != 0x1c) {
     if (UNLIKELY(bufsz < 4))
       return FRV_PARTIAL;
