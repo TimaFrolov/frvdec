@@ -187,7 +187,9 @@ static int frv_decode4(uint32_t inst, FrvInst* restrict frv_inst) {
   return 4;
 }
 
-int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvInst* restrict frv_inst) {
+int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvOptions opt,
+               FrvInst* restrict frv_inst) {
+  (void) opt;
   if (UNLIKELY(bufsz < 2))
     return FRV_PARTIAL;
   if ((buf[0] & 0x03) != 0x03)

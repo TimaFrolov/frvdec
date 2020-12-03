@@ -9,6 +9,14 @@
 extern "C" {
 #endif
 
+enum FrvOptions {
+  FRV_RV32 = 0 << 0,
+  FRV_RV64 = 1 << 0,
+  FRV_RV128 = 2 << 0,
+  FRV_RVMSK = 3 << 0,
+};
+typedef enum FrvOptions FrvOptions;
+
 enum {
   FRV_UNDEF = -1,
   FRV_PARTIAL = -2,
@@ -79,7 +87,7 @@ struct FrvInst {
   int32_t imm;
 };
 
-int frv_decode(size_t bufsz, const uint8_t* buf, FrvInst* frv_inst);
+int frv_decode(size_t bufsz, const uint8_t* buf, FrvOptions, FrvInst* frv_inst);
 
 // Note: actual format is unstable.
 void frv_format(const FrvInst* inst, size_t len, char* buf);
