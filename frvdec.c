@@ -192,7 +192,6 @@ static int frv_decode2(uint16_t inst, FrvOptions opt,
                        FrvInst* restrict frv_inst) {
   enum {
     ENC_I_NONE = 0,
-    ENC_NZU_54_96_2_3,
     ENC_U_53_76,
     ENC_U_53_26,
     ENC_U_5_42_76,
@@ -200,13 +199,16 @@ static int frv_decode2(uint16_t inst, FrvOptions opt,
     ENC_U_52_76,
     ENC_U_53_86,
     ENC_I_5_40,
+    ENC_I_11_4_98_10_6_7_31_5,
+    ENC_I_8_43_76_21_5,
+    ENC_I_EBREAK,
+
+    ENC_NZ_START,
+    ENC_NZU_54_96_2_3,
     ENC_NZI_5_40,
     ENC_NZU_5_40,
-    ENC_I_11_4_98_10_6_7_31_5,
     ENC_NZI_9_4_6_87_5,
-    ENC_I_8_43_76_21_5,
     ENC_NZI_17_1612,
-    ENC_I_EBREAK,
   } imm_enc = ENC_I_NONE;
   unsigned rs2f = UBFX(inst, 2, 6);
   unsigned rs2c = UBFX(inst, 2, 4) + 8;
@@ -392,6 +394,8 @@ static int frv_decode2(uint16_t inst, FrvOptions opt,
     frv_inst->imm = SBFX(inst, 12, 12) << 17 | UBFX(inst, 2, 6) << 12; break;
   default: return FRV_UNDEF;
   }
+  if (imm_enc >= ENC_NZ_START && !frv_inst->imm)
+    return FRV_UNDEF;
   return 2;
 }
 
