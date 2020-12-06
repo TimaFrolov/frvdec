@@ -126,14 +126,14 @@ static int frv_decode4(uint32_t inst, FrvInst* restrict frv_inst) {
     case 0x09: encoding = ENC_R | ENC_F_RM; mnem = FRV_FMULD; break;
     case 0x0c: encoding = ENC_R | ENC_F_RM; mnem = FRV_FDIVS; break;
     case 0x0d: encoding = ENC_R | ENC_F_RM; mnem = FRV_FDIVD; break;
+    case 0x20: encoding = ENC_R2 | ENC_F_RM; mnem = (const uint16_t[32]) {0, FRV_FCVTSD}[UBFX(inst, 20, 24)]; break;
+    case 0x21: encoding = ENC_R2 | ENC_F_RM; mnem = (const uint16_t[32]) {FRV_FCVTDS}[UBFX(inst, 20, 24)]; break;
     case 0x2c: encoding = ENC_R2 | ENC_F_RM; mnem = FRV_FSQRTS; break; // TODO: check rs2
     case 0x2d: encoding = ENC_R2 | ENC_F_RM; mnem = FRV_FSQRTD; break; // TODO: check rs2
     case 0x10: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FSGNJS, FRV_FSGNJNS, FRV_FSGNJXS, 0, 0, 0, 0, 0}[funct3]; break;
     case 0x11: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FSGNJD, FRV_FSGNJND, FRV_FSGNJXD, 0, 0, 0, 0, 0}[funct3]; break;
     case 0x14: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FMINS, FRV_FMAXS, 0, 0, 0, 0, 0, 0}[funct3]; break;
     case 0x15: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FMIND, FRV_FMAXD, 0, 0, 0, 0, 0, 0}[funct3]; break;
-    case 0x40: encoding = ENC_R2 | ENC_F_RM; mnem = (const uint16_t[32]) {0, FRV_FCVTSD}[UBFX(inst, 20, 24)]; break;
-    case 0x41: encoding = ENC_R2 | ENC_F_RM; mnem = (const uint16_t[32]) {FRV_FCVTDS}[UBFX(inst, 20, 24)]; break;
     case 0x50: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FLES, FRV_FLTS, FRV_FEQS, 0, 0, 0, 0, 0}[funct3]; break;
     case 0x51: encoding = ENC_R; mnem = (const uint16_t[]) {FRV_FLED, FRV_FLTD, FRV_FEQD, 0, 0, 0, 0, 0}[funct3]; break;
     case 0x60: encoding = ENC_R2 | ENC_F_RM; mnem = (const uint16_t[32]) {FRV_FCVTWS, FRV_FCVTWUS, FRV_FCVTLS, FRV_FCVTLUS}[UBFX(inst, 20, 24)]; break;
