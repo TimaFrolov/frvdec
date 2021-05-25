@@ -8,8 +8,6 @@ install_headers('frvdec.h')
 test('decode', executable('test_decode', 'test.c', dependencies: frvdec))
 
 pkg = import('pkgconfig')
-pkg.generate(libraries: libfrvdec,
+pkg.generate(libfrvdec,
              version: '0.1',
-             name: 'frvdec',
-             filebase: 'frvdec',
              description: 'RISC-V Decoder')
