@@ -1,0 +1,12 @@
+image: alpine/edge
+sources:
+- https://git.sr.ht/~aengelke/frvdec
+packages:
+- meson
+tasks:
+- build: |
+    mkdir frvdec-build
+    meson frvdec-build frvdec
+    ninja -C frvdec-build
+- check: |
+    ninja -C frvdec-build test
