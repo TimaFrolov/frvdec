@@ -8,7 +8,7 @@
 #define LOAD_LE_2(buf) (LOAD_LE_1(buf) | LOAD_LE_1((uint8_t*) (buf) + 1)<<8)
 #define LOAD_LE_4(buf) (LOAD_LE_2(buf) | LOAD_LE_2((uint8_t*) (buf) + 2)<<16)
 #define UBFX(val, start, end) (((val) >> start) & ((1 << (end - start + 1)) - 1))
-#define SBFX(val, start, end) ((struct { long v: end-start+1; }) {UBFX(val, start, end)}.v)
+#define SBFXIZ(val, start, end, shl) ((struct { long v: end-start+1+shl; }) {UBFX(val, start, end)<<shl}.v)
 #define UNLIKELY(x) __builtin_expect((x), 0)
 
 static int frv_decode4(uint32_t inst, FrvInst* restrict frv_inst) {
@@ -354,9 +354,9 @@ static int frv_decode2(uint16_t inst, FrvOptions opt,
   switch (imm_enc) {
   case ENC_I_NONE: frv_inst->imm = 0; break;
   case ENC_I_EBREAK: frv_inst->imm = 1; break;
-  case ENC_I_5_40: frv_inst->imm = SBFX(inst, 12, 12) << 5 | UBFX(inst, 2, 6); break;
+  case ENC_I_5_40: frv_inst->imm = SBFXIZ(inst, 12, 12, 5) | UBFX(inst, 2, 6); break;
   case ENC_NZI_9_4_6_87_5:
-    frv_inst->imm = SBFX(inst, 12, 12) << 9 | UBFX(inst, 3, 4) << 7 |
+    frv_inst->imm = SBFXIZ(inst, 12, 12, 9) | UBFX(inst, 3, 4) << 7 |
                     UBFX(inst, 5, 5) << 6 | UBFX(inst, 2, 2) << 5 |
                     UBFX(inst, 6, 6) << 4; break;
   case ENC_NZU_54_96_2_3:
@@ -380,18 +380,18 @@ static int frv_decode2(uint16_t inst, FrvOptions opt,
   case ENC_NZU_5_40:
     frv_inst->imm = UBFX(inst, 12, 12) << 5 | UBFX(inst, 2, 6); break;
   case ENC_NZI_5_40:
-    frv_inst->imm = SBFX(inst, 12, 12) << 5 | UBFX(inst, 2, 6); break;
+    frv_inst->imm = SBFXIZ(inst, 12, 12, 5) | UBFX(inst, 2, 6); break;
   case ENC_I_8_43_76_21_5:
-    frv_inst->imm = SBFX(inst, 12, 12) << 8 | UBFX(inst, 5, 6) << 6 |
+    frv_inst->imm = SBFXIZ(inst, 12, 12, 8) | UBFX(inst, 5, 6) << 6 |
                     UBFX(inst, 2, 2) << 5 | UBFX(inst, 10, 11) << 3 |
                     UBFX(inst, 3, 4) << 1; break;
   case ENC_I_11_4_98_10_6_7_31_5:
-    frv_inst->imm = SBFX(inst, 12, 12) << 11 | UBFX(inst, 8, 8) << 10 |
+    frv_inst->imm = SBFXIZ(inst, 12, 12, 11) | UBFX(inst, 8, 8) << 10 |
                     UBFX(inst, 9, 10) << 8 | UBFX(inst, 6, 6) << 7 |
                     UBFX(inst, 7, 7) << 6 | UBFX(inst, 2, 2) << 5 |
                     UBFX(inst, 11, 11) << 4 | UBFX(inst, 3, 5) << 1; break;
   case ENC_NZI_17_1612:
-    frv_inst->imm = SBFX(inst, 12, 12) << 17 | UBFX(inst, 2, 6) << 12; break;
+    frv_inst->imm = SBFXIZ(inst, 12, 12, 17) | UBFX(inst, 2, 6) << 12; break;
   default: return FRV_UNDEF;
   }
   if (imm_enc >= ENC_NZ_START && !frv_inst->imm)
