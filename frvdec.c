@@ -394,8 +394,16 @@ static int frv_decode2(uint16_t inst, FrvOptions opt,
     frv_inst->imm = SBFXIZ(inst, 12, 12, 17) | UBFX(inst, 2, 6) << 12; break;
   default: return FRV_UNDEF;
   }
-  if (imm_enc >= ENC_NZ_START && !frv_inst->imm)
-    return FRV_UNDEF;
+
+  if (imm_enc >= ENC_NZ_START && !frv_inst->imm) {
+    /* For most nzimm RV64C instructions, an immediate == 0 is invalid or reserved, but
+     * for C.ADDI when rd == x0 it is used to encode a NOP instruction
+     */
+
+    if (frv_inst->rd != 0 || frv_inst->mnem != FRV_ADDI) {
+      return FRV_UNDEF;
+    }
+  }
   return 2;
 }
 

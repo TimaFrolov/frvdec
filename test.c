@@ -48,6 +48,7 @@ int main(void) {
   failed |= test64(4, 0xd2287553, "fcvt.d.l r10 r16");
   failed |= test(4, 0x02957553, "fadd.d r10 r10 r9");
   failed |= test(4, 0x420686d3, "fcvt.d.s r13 r13");
+  failed |= test(4, 0x00100013, "addi r0 r0 1");
 
   failed |= test(2, 0x4601, "addi r12 r0"); // implicit 0 in printed output
   failed |= test(2, 0x002c, "addi r11 r2 8");
@@ -68,6 +69,7 @@ int main(void) {
   failed |= test(2, 0xfe75, "bne r12 r0 -4");
   failed |= test(2, 0xa029, "jal r0 10");
   failed |= test(2, 0x78fd, "lui r17 -4096");
+  failed |= test(2, 0x0001, "addi r0 r0"); /* C.ADDI is normally not allowed an imm=0, except with rd=0 encoding a NOP */
 
   puts(failed ? "Some tests FAILED" : "All tests PASSED");
   return failed ? EXIT_FAILURE : EXIT_SUCCESS;
