@@ -407,7 +407,7 @@ static int frv_decode2(uint16_t inst, FrvOptions opt,
   return 2;
 }
 
-int frv_decode(size_t bufsz, const uint8_t buf[bufsz], FrvOptions opt,
+int frv_decode(size_t bufsz, const uint8_t* buf, FrvOptions opt,
                FrvInst* restrict frv_inst) {
   if (UNLIKELY(bufsz < 2))
     return FRV_PARTIAL;
@@ -443,7 +443,7 @@ static char* frv_format_int(int32_t val, char buf[static 16]) {
   return &buf[idx];
 }
 
-void frv_format(const FrvInst* inst, size_t len, char buf[len]) {
+void frv_format(const FrvInst* inst, size_t len, char* restrict buf) {
   char tmp[18];
   if (!len)
     return;
