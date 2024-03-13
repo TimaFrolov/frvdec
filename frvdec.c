@@ -56,9 +56,9 @@ static int frv_decode4(uint32_t inst, FrvInst* restrict frv_inst) {
     switch (funct3) {
     case 0: encoding = ENC_I; mnem = FRV_ADDI; break;
     case 1: 
-      switch(funct7) {
+      switch(funct7>>1) {
         case 0x00: encoding = ENC_I_SHAMT; mnem = FRV_SLLI; break;
-        case 0x30: encoding = ENC_R2; mnem = FRV_CPOP; break;
+        case 0x18: encoding = ENC_R2; mnem = FRV_CPOP; break;
       }
       break;
     case 2: encoding = ENC_I; mnem = FRV_SLTI; break;
