@@ -1,9 +1,16 @@
+
+.data
+helloworld:      .string "Hello World!\n\0"
+strtwo:            .string "xxxxxxxxxxxxxxxxxxxx\n\0"
+FUCK:            .string "FUCK\n\0"
+
 # https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc
 .text
 .balign 4
 .global strcpy
 .global strlen
-.global main
+.global _start
+.global myitoa
 
 # size_t strlen(const char *str)
 # a0 holds *str
@@ -26,21 +33,21 @@ loop:
     ret
 
 # char* strcpy(char *dst, const char* src)
-strcpy:
-    mv a2, a0             # Copy dst
-    li t0, -1             # Infinite AVL (application vector length)
-loop_strcpy:
-    vsetvli x0, t0, e8, m8, ta, ma  # Max length vectors of bytes
-    vle8ff.v v8, (a1)        # Get src bytes
-    csrr t1, vl              # Get number of bytes fetched
-    vmseq.vi v1, v8, 0       # Flag zero bytes
-    vfirst.m a3, v1          # Zero found?
-    add a1, a1, t1           # Bump pointer
-    vmsif.m v0, v1           # Set mask up to and including zero byte.
-    vse8.v v8, (a2), v0.t    # Write out bytes
-    add a2, a2, t1           # Bump pointer
-    bltz a3, loop_strcpy     # Zero byte not found, so loop
-    ret
+# strcpy:
+#     mv a2, a0             # Copy dst
+#     li t0, -1             # Infinite AVL (application vector length)
+# loop_strcpy:
+#     vsetvli x0, t0, e8, m8, ta, ma  # Max length vectors of bytes
+#     vle8ff.v v8, (a1)        # Get src bytes
+#     csrr t1, vl              # Get number of bytes fetched
+#     vmseq.vi v1, v8, 0       # Flag zero bytes
+#     vfirst.m a3, v1          # Zero found?
+#     add a1, a1, t1           # Bump pointer
+#     vmsif.m v0, v1           # Set mask up to and including zero byte.
+#     vse8.v v8, (a2), v0.t    # Write out bytes
+#     add a2, a2, t1           # Bump pointer
+#     bltz a3, loop_strcpy     # Zero byte not found, so loop
+#     ret
 
 myitoa:
     sll     a2,a2,0x20
@@ -60,27 +67,28 @@ myitoa_loop:
     bltu    a2,a3,myitoa_loop
 myitoa_fin:
     ret
-
-main:
+# .global main
+_start:
+    .option push
+    .option norelax
+    la gp, __global_pointer$
+    .option pop
     li      a7, 64  # write on RISCV linux
     li      a0, 1
     la      a1, helloworld
-    li      a2, 14
+    li      a2, 15
     ecall
-    li a0, 12
-    la      a1, str2
+#    la a0, helloworld
+#    call strlen
+    la      a1, strtwo
     li      a2, 10
     call myitoa
-    li      a7, 64  # write on RISCV linux
-    li      a0, 1
-    la      a1, str2
-    li      a2, 14
-    ecall
+#    li      a7, 64  # write on RISCV linux
+#    li      a0, 1
+#    la      a1, strtwo
+#    li      a2, 22
+#    ecall
 
     li      a7, 93  # Service command code 93 terminates
-    li      a0, 0   # Use 0 return code
+    li      a0, 1   # Use 0 return code
     ecall           # Call linux to terminate the program
-
-.data
-helloworld:      .ascii "Hello World!\n\0"
-str2:            .ascii "xxxxxxxxxxxxxxxxxxxx\0"
